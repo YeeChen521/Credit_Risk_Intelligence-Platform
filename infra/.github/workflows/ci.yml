@@ -82,8 +82,11 @@ jobs:
 
       - name: Run unit tests only
         run: |
-          # Exit code 5 means "no tests collected" — not a failure, just an empty suite.
-          pytest tests/unit/ -q; code=$?; [ $code -eq 5 ] && exit 0 || exit $code
+          set +e
+          pytest tests/unit/ -q
+          code=$?
+          if [ $code -eq 5 ]; then echo "No unit tests yet — skipping"; exit 0; fi
+          exit $code
         # Integration tests require a running API with a real model bundle.
         # Run locally with: pytest tests/integration/
         # TODO: enable integration tests in CI once model bundle artifact
