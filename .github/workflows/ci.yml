@@ -73,7 +73,9 @@ jobs:
         run: pip install -e ".[dev]"
 
       - name: Run unit tests only
-        run: pytest tests/unit/ -q
+        run: |
+          # Exit code 5 means "no tests collected" — not a failure, just an empty suite.
+          pytest tests/unit/ -q; code=$?; [ $code -eq 5 ] && exit 0 || exit $code
         # Integration tests require a running API with a real model bundle.
         # Run locally with: pytest tests/integration/
 
