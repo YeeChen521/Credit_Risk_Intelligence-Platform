@@ -20,7 +20,7 @@ from dotenv import load_dotenv
 from scipy.stats import ks_2samp
 from sklearn.metrics import roc_auc_score
 
-from src.features.feature_registry import ID_COL, TARGET_COL, get_feature_cols
+from src.features.feature_registry import ID_COL, TARGET_COL
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 PROCESSED_DIR = PROJECT_ROOT / "data" / "processed"
