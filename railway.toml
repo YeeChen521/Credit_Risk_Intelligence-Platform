@@ -1,0 +1,27 @@
+# Required environment variables — set these in Railway dashboard:
+#   DATABASE_URL        — Railway PostgreSQL plugin provides this automatically
+#   REDIS_URL           — Railway Redis plugin provides this automatically
+#   MLFLOW_TRACKING_URI — set to your MLflow server URL (or Railway MLflow service)
+#   API_SECRET_KEY      — generate a strong random string
+#   ALERT_WEBHOOK_URL   — Slack or PagerDuty webhook URL
+#
+# Railway deployment steps:
+#   1. Create a new Railway project
+#   2. Add PostgreSQL and Redis plugins
+#   3. Connect this GitHub repo
+#   4. Set the environment variables above
+#   5. Railway auto-deploys on push to main
+#
+# Dashboard service: create a second Railway service pointing to Dockerfile.dashboard
+#   Set API_BASE_URL to the Railway API service's internal URL
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+startCommand = "uvicorn src.api.main:app --host 0.0.0.0 --port $PORT"
+healthcheckPath = "/health"
+healthcheckTimeout = 30
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3

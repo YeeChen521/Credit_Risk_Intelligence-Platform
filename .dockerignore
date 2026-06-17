@@ -1,0 +1,9 @@
+.env
+mlruns/
+data/raw/
+data/processed/
+notebooks/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+*.pyc
