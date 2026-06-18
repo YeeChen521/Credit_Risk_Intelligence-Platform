@@ -13,6 +13,7 @@ if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 
 import asyncio
+import hashlib
 import json
 import logging
 from datetime import datetime, timezone
@@ -125,7 +126,12 @@ async def _run_prediction(request: PredictRequest, app_state: Any) -> Prediction
     """Execute the full scoring pipeline for one applicant and return a PredictionResponse."""
 
     redis: aioredis.Redis = app_state.redis_client
-    key = f"prediction:{request.application.SK_ID_CURR}"
+    # Cache key includes a hash of the full payload so that changing any
+    # application field produces a fresh prediction even for the same ID.
+    payload_hash = hashlib.md5(
+        request.model_dump_json().encode(), usedforsecurity=False
+    ).hexdigest()[:8]
+    key = f"prediction:{request.application.SK_ID_CURR}:{payload_hash}"
 
     # Step 1 — Redis cache check
     cached_raw = await redis.get(key)

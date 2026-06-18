@@ -22,53 +22,97 @@ with left:
     st.subheader("Applicant Data")
 
     sk_id_curr = st.number_input(
-        "Application ID (SK_ID_CURR)", min_value=1, step=1, value=100001
+        "Application ID (SK_ID_CURR)", min_value=1, step=1, value=100002
     )
 
-    with st.expander("Application Details", expanded=False):
-        amt_income_total = st.number_input("Annual Income", value=150000.0)
-        amt_credit = st.number_input("Credit Amount", value=450000.0)
-        amt_annuity = st.number_input("Annuity Amount", value=20000.0)
-        amt_goods_price = st.number_input("Goods Price", value=400000.0)
-        days_birth = st.number_input("Days Birth (negative)", value=-12000)
-        days_employed = st.number_input("Days Employed (negative)", value=-2000)
-        ext_source_1 = st.slider("EXT SOURCE 1", 0.0, 1.0, 0.5)
-        ext_source_2 = st.slider("EXT SOURCE 2", 0.0, 1.0, 0.6)
-        ext_source_3 = st.slider("EXT SOURCE 3", 0.0, 1.0, 0.4)
-        code_gender = st.selectbox("Gender", ["M", "F", "XNA"])
-        flag_own_car = st.selectbox("Owns Car", ["Y", "N"])
-        flag_own_realty = st.selectbox("Owns Realty", ["Y", "N"])
+    # Fetch real applicant data from the API whenever the ID changes
+    fetched: dict = {}
+    fetch_error: str = ""
+    if sk_id_curr:
+        try:
+            resp = requests.get(f"{API_BASE_URL}/applicant/{int(sk_id_curr)}", timeout=10)
+            if resp.status_code == 200:
+                fetched = resp.json()
+            elif resp.status_code == 404:
+                fetch_error = f"ID {sk_id_curr} not found in training data — using manual inputs."
+            else:
+                fetch_error = f"Could not load applicant data (HTTP {resp.status_code})."
+        except requests.exceptions.RequestException:
+            fetch_error = "Could not reach API to load applicant data."
+
+    if fetch_error:
+        st.warning(fetch_error)
+    elif fetched:
+        st.success(f"Loaded data for applicant {sk_id_curr}")
+
+    def _f(key: str, default):
+        """Return fetched value if present and non-None, else the default."""
+        v = fetched.get(key)
+        return v if v is not None else default
+
+    with st.expander("Application Details", expanded=bool(fetched)):
+        amt_income_total = st.number_input("Annual Income",        value=float(_f("AMT_INCOME_TOTAL", 150000.0)))
+        amt_credit       = st.number_input("Credit Amount",        value=float(_f("AMT_CREDIT",       450000.0)))
+        amt_annuity      = st.number_input("Annuity Amount",       value=float(_f("AMT_ANNUITY",       20000.0)))
+        amt_goods_price  = st.number_input("Goods Price",          value=float(_f("AMT_GOODS_PRICE",  400000.0)))
+        days_birth       = st.number_input("Days Birth (negative)", value=int(_f("DAYS_BIRTH",        -12000)))
+        days_employed    = st.number_input("Days Employed (negative)", value=int(_f("DAYS_EMPLOYED",   -2000)))
+        ext_source_1     = st.slider("EXT SOURCE 1", 0.0, 1.0, float(_f("EXT_SOURCE_1", 0.5)))
+        ext_source_2     = st.slider("EXT SOURCE 2", 0.0, 1.0, float(_f("EXT_SOURCE_2", 0.6)))
+        ext_source_3     = st.slider("EXT SOURCE 3", 0.0, 1.0, float(_f("EXT_SOURCE_3", 0.4)))
+
+        gender_opts = ["M", "F", "XNA"]
+        code_gender = st.selectbox(
+            "Gender", gender_opts,
+            index=gender_opts.index(_f("CODE_GENDER", "M")) if _f("CODE_GENDER", "M") in gender_opts else 0
+        )
+
+        car_opts = ["Y", "N"]
+        flag_own_car = st.selectbox(
+            "Owns Car", car_opts,
+            index=car_opts.index(_f("FLAG_OWN_CAR", "Y")) if _f("FLAG_OWN_CAR", "Y") in car_opts else 0
+        )
+
+        realty_opts = ["Y", "N"]
+        flag_own_realty = st.selectbox(
+            "Owns Realty", realty_opts,
+            index=realty_opts.index(_f("FLAG_OWN_REALTY", "Y")) if _f("FLAG_OWN_REALTY", "Y") in realty_opts else 0
+        )
+
+        contract_opts = ["Cash loans", "Revolving loans"]
         name_contract_type = st.selectbox(
-            "Contract Type", ["Cash loans", "Revolving loans"]
+            "Contract Type", contract_opts,
+            index=contract_opts.index(_f("NAME_CONTRACT_TYPE", "Cash loans")) if _f("NAME_CONTRACT_TYPE", "Cash loans") in contract_opts else 0
         )
+
+        income_opts = ["Working", "Commercial associate", "Pensioner", "State servant", "Unemployed"]
         name_income_type = st.selectbox(
-            "Income Type",
-            ["Working", "Commercial associate", "Pensioner", "State servant", "Unemployed"],
+            "Income Type", income_opts,
+            index=income_opts.index(_f("NAME_INCOME_TYPE", "Working")) if _f("NAME_INCOME_TYPE", "Working") in income_opts else 0
         )
+
+        edu_opts = [
+            "Secondary / secondary special", "Higher education",
+            "Incomplete higher", "Lower secondary", "Academic degree",
+        ]
         name_education_type = st.selectbox(
-            "Education Type",
-            [
-                "Secondary / secondary special",
-                "Higher education",
-                "Incomplete higher",
-                "Lower secondary",
-                "Academic degree",
-            ],
+            "Education Type", edu_opts,
+            index=edu_opts.index(_f("NAME_EDUCATION_TYPE", "Secondary / secondary special")) if _f("NAME_EDUCATION_TYPE", "Secondary / secondary special") in edu_opts else 0
         )
+
+        family_opts = ["Married", "Single / not married", "Civil marriage", "Separated", "Widow"]
         name_family_status = st.selectbox(
-            "Family Status",
-            ["Married", "Single / not married", "Civil marriage", "Separated", "Widow"],
+            "Family Status", family_opts,
+            index=family_opts.index(_f("NAME_FAMILY_STATUS", "Married")) if _f("NAME_FAMILY_STATUS", "Married") in family_opts else 0
         )
+
+        housing_opts = [
+            "House / apartment", "With parents", "Municipal apartment",
+            "Rented apartment", "Office apartment", "Co-op apartment",
+        ]
         name_housing_type = st.selectbox(
-            "Housing Type",
-            [
-                "House / apartment",
-                "With parents",
-                "Municipal apartment",
-                "Rented apartment",
-                "Office apartment",
-                "Co-op apartment",
-            ],
+            "Housing Type", housing_opts,
+            index=housing_opts.index(_f("NAME_HOUSING_TYPE", "House / apartment")) if _f("NAME_HOUSING_TYPE", "House / apartment") in housing_opts else 0
         )
 
     st.info(

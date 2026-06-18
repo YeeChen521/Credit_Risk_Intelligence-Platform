@@ -22,6 +22,7 @@ from db import create_db_pool, init_db
 from health import health_router, model_router
 from middleware import LoggingMiddleware, register_exception_handler
 from portfolio import router as portfolio_router
+from applicant import router as applicant_router
 from predict import router as predict_router
 
 logger = logging.getLogger(__name__)
@@ -138,6 +139,7 @@ app.add_middleware(
 register_exception_handler(app)
 
 app.include_router(predict_router)
+app.include_router(applicant_router)
 app.include_router(health_router)
 app.include_router(model_router)
 app.include_router(portfolio_router)

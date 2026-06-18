@@ -46,6 +46,7 @@ services:
     volumes:
       - ../models:/app/models:ro
       - ../mlruns:/app/mlruns:ro
+      - ../data/raw:/app/data/raw:ro
     depends_on:
       - postgres
       - redis
