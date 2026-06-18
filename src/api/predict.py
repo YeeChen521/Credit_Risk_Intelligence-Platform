@@ -87,6 +87,7 @@ _CC_SCHEMA: dict[str, pl.DataType] = {
     "SK_ID_CURR": pl.Int64, "SK_ID_PREV": pl.Int64, "MONTHS_BALANCE": pl.Int64,
     "AMT_BALANCE": pl.Float64, "AMT_CREDIT_LIMIT_ACTUAL": pl.Float64,
     "AMT_DRAWINGS_ATM_CURRENT": pl.Float64, "AMT_DRAWINGS_CURRENT": pl.Float64,
+    "CNT_DRAWINGS_CURRENT": pl.Float64,
     "AMT_INST_MIN_REGULARITY": pl.Float64, "AMT_PAYMENT_CURRENT": pl.Float64,
     "AMT_TOTAL_RECEIVABLE": pl.Float64, "SK_DPD": pl.Int64, "SK_DPD_DEF": pl.Int64,
 }
@@ -164,6 +165,17 @@ async def _run_prediction(request: PredictRequest, app_state: Any) -> Prediction
     bundle = app_state.bundle
     feature_cols: list[str] = bundle["feature_cols"]
     cat_cols: list[str] = bundle["cat_cols"]
+
+    # Add any feature columns absent from master (application fields not in
+    # the API request schema) with safe defaults so the encoder never sees NaN.
+    cat_set = set(cat_cols)
+    missing_master_cols = [c for c in feature_cols if c not in master.columns]
+    if missing_master_cols:
+        master = master.with_columns([
+            pl.lit("Missing").alias(c) if c in cat_set else pl.lit(0.0).alias(c)
+            for c in missing_master_cols
+        ])
+
     X: pd.DataFrame = master[feature_cols].to_pandas()
     X_enc = X.copy()
     with app_state.encoder_lock:

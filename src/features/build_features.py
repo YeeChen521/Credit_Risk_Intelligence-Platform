@@ -82,6 +82,7 @@ def handle_missing_application(df: pl.DataFrame,filename:str) -> pl.DataFrame:
     ext_exprs = []
     for col in ext_cols:
         median_val = out[col].median()
+        fill_val = median_val if median_val is not None else 0.5
 
         ext_exprs.append(
             pl.col(col)
@@ -92,7 +93,8 @@ def handle_missing_application(df: pl.DataFrame,filename:str) -> pl.DataFrame:
 
         ext_exprs.append(
             pl.col(col)
-            .fill_null(median_val)
+            .cast(pl.Float64)
+            .fill_null(fill_val)
             .alias(col)
         )
 
@@ -111,19 +113,24 @@ def handle_missing_application(df: pl.DataFrame,filename:str) -> pl.DataFrame:
             continue
 
         if is_categorical(col, dtype):
+            # cast first: Null-typed columns (all-None from API) need an
+            # explicit cast to Utf8 before fill_null accepts a string value.
             general_exprs.append(
-                pl.col(col).fill_null("Missing").alias(col)
+                pl.col(col).cast(pl.Utf8).fill_null("Missing").alias(col)
             )
 
         elif dtype.is_numeric():
             median_val = out[col].median()
+            fill_val = median_val if median_val is not None else 0.0
             general_exprs.append(
-                pl.col(col).fill_null(median_val).alias(col)
+                pl.col(col).fill_null(fill_val).alias(col)
             )
 
         else:
+            # Includes pl.Null (all-None column from API) that is not
+            # categorical — treat as numeric and default to 0.0.
             general_exprs.append(
-                pl.col(col).fill_null("Missing").alias(col)
+                pl.col(col).cast(pl.Float64).fill_null(0.0).alias(col)
             )
 
     all_exprs = ext_exprs + general_exprs
@@ -162,6 +169,18 @@ def bureau_balance_features(bureau_balance:pl.DataFrame) -> pl.DataFrame:
 
 def bureau_features(bureau:pl.DataFrame,bb_features:pl.DataFrame) -> pl.DataFrame:
     bureau_combined = bureau.join(bb_features, on="SK_ID_BUREAU", how="left")
+
+    # If bb_features was empty/minimal, add missing bb_* columns as nulls so
+    # the downstream aggregation can reference them (they become 0 via fill_null).
+    for _col, _dtype in [
+        ("bb_worst_status", pl.Int64),
+        ("bb_months_overdue_count", pl.UInt32),
+        ("bb_worst_status_last_6m", pl.Int64),
+    ]:
+        if _col not in bureau_combined.columns:
+            bureau_combined = bureau_combined.with_columns(
+                pl.lit(None).cast(_dtype).alias(_col)
+            )
 
     bureau_final_features = (
         bureau_combined
