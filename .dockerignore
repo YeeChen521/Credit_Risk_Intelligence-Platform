@@ -1,4 +1,9 @@
 .env
+.venv/
+venv/
+.git/
+.github/
+.vscode/
 mlruns/
 data/raw/
 data/processed/
@@ -7,3 +12,5 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 *.pyc
+*.pyo
+Cursor.md

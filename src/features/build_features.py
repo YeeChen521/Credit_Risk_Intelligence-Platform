@@ -2,9 +2,9 @@ import polars as pl
 from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-PROJECT_ROOT = SCRIPT_DIR.parents[3]
-RAW_DIR = PROJECT_ROOT / "projects" / "Credit Risk Intelligence Platform" / "data" / "raw"
-PROCESSED_DIR = PROJECT_ROOT / "projects" / "Credit Risk Intelligence Platform"/ "data" / "processed"
+PROJECT_ROOT = SCRIPT_DIR.parents[1]
+RAW_DIR = PROJECT_ROOT / "data" / "raw"
+PROCESSED_DIR = PROJECT_ROOT / "data" / "processed"
 
 DROP_HIGH_MISSING_PREFIXES = (
     "COMMONAREA_",
