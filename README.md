@@ -52,6 +52,10 @@ notebooks/
   01_eda.ipynb               # Exploratory analysis, missing value report
   02_feature_exploration.ipynb
 
+scripts/
+  batch_ingest.py            # Scores all processed Parquet rows and bulk-inserts into
+                             # predictions table; safe to re-run (deletes stale rows first)
+
 src/
   features/
     build_features.py        # Full pipeline: all aggregation functions + main()
@@ -65,7 +69,8 @@ src/
 
   api/
     main.py                  # FastAPI app, lifespan, bundle loading, DB + Redis init
-    schemas.py               # Pydantic v2 request/response models
+    schemas.py               # Pydantic v2 request/response models + compute_risk_tier()
+    applicant.py             # GET /applicant/{sk_id_curr} — raw CSV row lookup
     predict.py               # POST /predict, POST /predict/batch
     portfolio.py             # GET /portfolio/summary|predictions|flagged
     health.py                # GET /health, GET /model/info
@@ -164,6 +169,7 @@ pytest tests/integration/
 |--------|------|-------------|
 | POST | `/predict` | Score a single applicant, returns probability + top 10 SHAP features |
 | POST | `/predict/batch` | Score up to 100 applicants concurrently |
+| GET | `/applicant/{sk_id_curr}` | Raw application row from train/test CSV |
 | GET | `/portfolio/summary` | Risk tier breakdown + avg probability (`?period=all\|6m\|1y`) |
 | GET | `/portfolio/predictions` | Paginated prediction history with time filter |
 | GET | `/portfolio/flagged` | High-risk predictions only, downloadable as CSV |
@@ -214,6 +220,23 @@ Response shape:
 }
 ```
 
+Risk tier thresholds (applied consistently across the API, batch ingest, and dashboard):
+
+| Probability | Risk tier |
+|---|---|
+| < 0.30 | `LOW` |
+| 0.30 – 0.60 | `MEDIUM` |
+| > 0.60 | `HIGH` |
+
+## Batch ingest
+
+```bash
+# Populate the predictions table from processed Parquet files (Docker stack must be running)
+python scripts/batch_ingest.py
+```
+
+Reads `data/processed/train_complete` and `data/processed/test_complete`, scores every row with the production bundle, and bulk-inserts into `predictions`. Safe to re-run — deletes existing rows tagged `source=batch_ingest` before inserting. Expects PostgreSQL at `localhost:5432`.
+
 ## Drift monitoring
 
 ```bash
@@ -249,6 +272,7 @@ Drift reports are stored in `data/processed/drift/` with an ISO date suffix.
 - **asyncpg directly**: all SQL lives in `db.py` and `portfolio.py`. No raw SQL outside those files.
 - **Audit trail is mandatory**: every scoring request is written to PostgreSQL *before* returning.
 - **SHAP persisted**: computed at score time and stored with the request record; never recomputed on read.
+- **Redis cache key**: `prediction:{SK_ID_CURR}:{payload_hash}` — the hash is 8 characters of the MD5 of the full request JSON (TTL 3600 s). Changing any field in the request produces a new cache entry even for the same applicant ID.
 - **Errors**: structured JSON with `detail`; Great Expectations failures return HTTP 422.
 
 ### ML layer
@@ -292,11 +316,9 @@ All gates must pass; failing lint/tests blocks the Docker build. GHCR push runs 
 4. The API loads the model tagged `production` on startup—redeploy the API container to pick up the new model
 5. Archive the previous production run tag (`stage: archived`)
 
-## Auth (placeholder)
+## Auth (placeholder — not yet implemented)
 
-JWT validation lives in `src/api/auth.py`. Current implementation accepts a shared secret from `.env` (`API_SECRET_KEY`).
-
-To integrate with an identity provider, replace `verify_token` with OAuth2/OIDC token verification logic. All routers depend on `verify_token`.
+`src/api/auth.py` does not yet exist and no auth middleware is wired into any router. When implementing: create a `verify_token` dependency that validates `API_SECRET_KEY` from `.env` (or delegates to an OAuth2/OIDC provider), then add `dependencies=[Depends(verify_token)]` to each router in `main.py`.
 
 ## Secrets management
 
